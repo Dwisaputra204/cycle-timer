@@ -1,0 +1,7 @@
+{
+  "name": "cycle-timer",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "react-vite"
+}
