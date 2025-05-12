@@ -50,43 +50,35 @@ const Cycle: React.FC = () => {
 
   useEffect(() => {
     const loadConfig = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
-        const fileExists = await Filesystem.check({
+        // Coba langsung baca file
+        const { data } = await Filesystem.readFile({
           path: "config.json",
           directory: Directory.Documents,
+          encoding: Encoding.UTF8,
         });
 
-        if (fileExists.value) {
-          const result = await Filesystem.readFile({
-            path: "config.json",
-            directory: Directory.Documents,
-            encoding: Encoding.UTF8,
-          });
-          const configData = JSON.parse(
-            typeof result.data === "string" ? result.data : ""
-          );
-          // Gunakan selectedHauler untuk memilih antara cap777 dan cap773
-          setCapacity(
-            parseInt(
-              configData[selectedHauler === "777" ? "cap777" : "cap773"],
-              10
-            )
-          );
+        const configData = JSON.parse(typeof data === "string" ? data : "{}");
+        const haulerKey = selectedHauler === "777" ? "cap777" : "cap773";
+        const capacityValue = parseInt(configData[haulerKey], 10);
+
+        if (!isNaN(capacityValue)) {
+          setCapacity(capacityValue);
         } else {
-          // Jika file tidak ada, gunakan nilai default.
-          setCapacity(selectedHauler === "777" ? 41 : 25); // Default values
-          console.warn("Config file not found, using default capacity");
+          console.warn("Invalid capacity in config file, using default");
+          setCapacity(selectedHauler === "777" ? 41 : 25);
         }
       } catch (error) {
-        console.error("Error loading config:", error);
-        setCapacity(selectedHauler === "777" ? 41 : 25); // Fallback ke default
+        console.warn("File not found or error reading config:", error);
+        setCapacity(selectedHauler === "777" ? 41 : 25);
       } finally {
         setLoading(false);
       }
     };
+
     loadConfig();
-  }, [selectedHauler]); // Dependency on selectedHauler
+  }, [selectedHauler]);
 
   const startLoaderTimer = () => {
     setLoaderTime(0);
