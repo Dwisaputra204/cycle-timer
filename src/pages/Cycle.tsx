@@ -18,7 +18,12 @@ import {
   IonCol,
 } from "@ionic/react";
 import React, { useState, useEffect } from "react";
-import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
+
+interface MaterialData {
+  name: string;
+  val777: number;
+  val773: number;
+}
 
 const Cycle: React.FC = () => {
   const [loaderTime, setLoaderTime] = useState(0);
@@ -33,13 +38,32 @@ const Cycle: React.FC = () => {
   const [recommendedHauler, setRecommendedHauler] = useState<number | null>(
     null
   );
-  const [capacity, setCapacity] = useState(0); // State untuk menyimpan capacity
-  const [loading, setLoading] = useState(true);
+  const [capacity, setCapacity] = useState(0);
   const [haulerButtonDisabled, setHaulerButtonDisabled] = useState(false);
-  const [selectedHauler, setSelectedHauler] = useState("777"); // Default value
+  const [selectedHauler, setSelectedHauler] = useState("777");
+  const [selectedMaterial, setSelectedMaterial] = useState<string | null>(null);
   const [pdtyLoad, setPdtyLoad] = useState<number | null>(null);
   const [pdtyHaul, setPdtyHaul] = useState<number | null>(null);
   const [matchFactor, setMatchFactor] = useState<number | null>(null);
+  const [materialData, setMaterialData] = useState<MaterialData[]>([]);
+
+  // Mengambil nilai selectedMaterial dari localStorage saat komponen dimuat
+  useEffect(() => {
+    const savedMaterial = localStorage.getItem("selectedMaterial");
+    if (savedMaterial) {
+      setSelectedMaterial(savedMaterial);
+    }
+
+    // Mengambil data material dari localStorage saat komponen dimuat
+    loadMaterialData();
+  }, []);
+
+  const loadMaterialData = () => {
+    const storedMaterials = localStorage.getItem("materials");
+    if (storedMaterials) {
+      setMaterialData(JSON.parse(storedMaterials));
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -48,39 +72,36 @@ const Cycle: React.FC = () => {
     };
   }, [loaderIntervalId, haulerIntervalId]);
 
+  // Efek untuk memperbarui kapasitas setiap kali selectedHauler atau selectedMaterial berubah
   useEffect(() => {
-    const loadConfig = async () => {
-      setLoading(true);
-      try {
-        // Coba langsung baca file
-        const { data } = await Filesystem.readFile({
-          path: "config.json",
-          directory: Directory.Documents,
-          encoding: Encoding.UTF8,
-        });
-
-        const configData = JSON.parse(typeof data === "string" ? data : "{}");
-        const haulerKey = selectedHauler === "777" ? "cap777" : "cap773";
-        const capacityValue = parseInt(configData[haulerKey], 10);
-
-        if (!isNaN(capacityValue)) {
-          setCapacity(capacityValue);
-        } else {
-          console.warn("Invalid capacity in config file, using default");
-          setCapacity(selectedHauler === "777" ? 41 : 25);
-        }
-      } catch (error) {
-        console.warn("File not found or error reading config:", error);
-        setCapacity(selectedHauler === "777" ? 41 : 25);
-      } finally {
-        setLoading(false);
+    console.log("useEffect - Pembaruan Kapasitas:", {
+      selectedHauler,
+      selectedMaterial,
+      materialData,
+    });
+    if (selectedHauler && selectedMaterial && materialData.length > 0) {
+      const foundMaterial = materialData.find(
+        (material) => material.name === selectedMaterial
+      );
+      console.log("Material Ditemukan:", foundMaterial);
+      if (foundMaterial) {
+        const newCapacity =
+          selectedHauler === "777"
+            ? foundMaterial.val777
+            : foundMaterial.val773;
+        setCapacity(newCapacity);
+        console.log("Kapasitas Diatur:", newCapacity);
+      } else {
+        console.warn("Material tidak ditemukan:", selectedMaterial);
+        setCapacity(selectedHauler === "777" ? 41 : 25); // Nilai default
+        console.log("Kapasitas Diatur (Default):", capacity);
       }
-    };
-
-    loadConfig();
-  }, [selectedHauler]);
+    }
+  }, [selectedHauler, selectedMaterial, materialData]);
 
   const startLoaderTimer = () => {
+    // Muat ulang data material dari localStorage setiap kali timer loader dimulai
+    loadMaterialData();
     setLoaderTime(0);
     setHaulerTime(0);
     setIsLoaderRunning(true);
@@ -97,7 +118,7 @@ const Cycle: React.FC = () => {
     );
     setRatio(null);
     setRecommendedHauler(null);
-    setHaulerButtonDisabled(true); // Disable Hauler Start on Loader Start
+    setHaulerButtonDisabled(true);
     setPdtyLoad(null);
     setPdtyHaul(null);
     setMatchFactor(null);
@@ -106,7 +127,6 @@ const Cycle: React.FC = () => {
   const stopLoaderTimer = () => {
     setIsLoaderRunning(false);
     if (loaderIntervalId) clearInterval(loaderIntervalId);
-    // setHaulerButtonDisabled(false); // Jangan enable di sini
   };
 
   const resetLoaderTimer = () => {
@@ -118,7 +138,7 @@ const Cycle: React.FC = () => {
     setHaulerTime(0);
     setRatio(null);
     setRecommendedHauler(null);
-    setHaulerButtonDisabled(false); // Enable di sini
+    setHaulerButtonDisabled(false);
     setPdtyLoad(null);
     setPdtyHaul(null);
     setMatchFactor(null);
@@ -137,7 +157,7 @@ const Cycle: React.FC = () => {
     setIsHaulerRunning(false);
     if (haulerIntervalId) clearInterval(haulerIntervalId);
     calculateRatioAndProduction();
-    setHaulerButtonDisabled(false); // Enable Hauler button after Hauler Stop
+    setHaulerButtonDisabled(false);
   };
 
   const resetHaulerTimer = () => {
@@ -146,7 +166,7 @@ const Cycle: React.FC = () => {
     setHaulerTime(0);
     setRatio(null);
     setRecommendedHauler(null);
-    setHaulerButtonDisabled(false); // Enable di sini
+    setHaulerButtonDisabled(false);
     setPdtyLoad(null);
     setPdtyHaul(null);
     setMatchFactor(null);
@@ -170,9 +190,8 @@ const Cycle: React.FC = () => {
     if (loaderSeconds > 0 && haulerSeconds > 0) {
       const currentRatio = haulerSeconds / loaderSeconds;
       setRatio(currentRatio);
-      setRecommendedHauler(Math.round(currentRatio)); // Use Math.round here
+      setRecommendedHauler(Math.round(currentRatio));
 
-      // Calculate additional values for summary
       const calculatedPdtyLoad = (3600 / loaderSeconds) * capacity;
       const calculatedPdtyHaul = (3600 / haulerSeconds) * capacity;
       const calculatedMatchFactor = recommendedHauler
@@ -195,6 +214,13 @@ const Cycle: React.FC = () => {
     setSelectedHauler(event.target.value);
   };
 
+  const handleMaterialChange = (event: any) => {
+    const newValue = event.target.value;
+    setSelectedMaterial(newValue);
+    localStorage.setItem("selectedMaterial", newValue); // Simpan perubahan material
+    console.log("handleMaterialChange - selectedMaterial:", newValue);
+  };
+
   useEffect(() => {
     calculateRatioAndProduction();
   }, [capacity, loaderTime, haulerTime, recommendedHauler]);
@@ -207,108 +233,104 @@ const Cycle: React.FC = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent className="ion-padding">
-        {loading ? (
-          <IonText>Loading configuration...</IonText>
-        ) : (
-          <>
-            <div>
+        <IonGrid>
+          <IonRow>
+            <IonCol size="4">
+              <IonSelect
+                value={selectedHauler}
+                onIonChange={handleHaulerChange}
+                interface="popover"
+              >
+                <IonSelectOption value="777">777</IonSelectOption>
+                <IonSelectOption value="773">773</IonSelectOption>
+              </IonSelect>
+            </IonCol>
+            <IonCol size="8">
+              <IonSelect
+                value={selectedMaterial}
+                onIonChange={handleMaterialChange}
+                interface="popover"
+              >
+                {materialData.map((material) => (
+                  <IonSelectOption key={material.name} value={material.name}>
+                    {material.name}
+                  </IonSelectOption>
+                ))}
+              </IonSelect>
+            </IonCol>
+          </IonRow>
+        </IonGrid>
+
+        {/* Loader Timer Section */}
+        <div>
+          <IonText>
+            <h1>{formatTime(loaderTime)}</h1>
+          </IonText>
+          {!isLoaderRunning ? (
+            <IonButton expand="block" onClick={startLoaderTimer}>
+              Mulai Loader
+            </IonButton>
+          ) : (
+            <IonButton expand="block" color="warning" onClick={stopLoaderTimer}>
+              Stop Loader
+            </IonButton>
+          )}
+          <IonButton expand="block" color="danger" onClick={resetLoaderTimer}>
+            Reset Loader
+          </IonButton>
+        </div>
+
+        {/* Hauler Timer Section */}
+        <IonGrid>
+          <IonRow>
+            <IonCol size="8">
               <IonText>
-                <h1>{formatTime(loaderTime)}</h1>
+                <h1>{formatTime(haulerTime)}</h1>
               </IonText>
-              {!isLoaderRunning ? (
-                <IonButton expand="block" onClick={startLoaderTimer}>
-                  Mulai Loader
-                </IonButton>
-              ) : (
-                <IonButton
-                  expand="block"
-                  color="warning"
-                  onClick={stopLoaderTimer}
-                >
-                  Stop Loader
-                </IonButton>
-              )}
-              <IonButton
-                expand="block"
-                color="danger"
-                onClick={resetLoaderTimer}
-              >
-                Reset Loader
-              </IonButton>
-            </div>
+            </IonCol>
+          </IonRow>
+        </IonGrid>
+        <IonButton
+          expand="block"
+          onClick={startHaulerTimer}
+          disabled={isLoaderRunning || haulerButtonDisabled}
+        >
+          Mulai Hauler
+        </IonButton>
+        {!isHaulerRunning ? null : (
+          <IonButton expand="block" color="warning" onClick={stopHaulerTimer}>
+            Stop Hauler
+          </IonButton>
+        )}
+        <IonButton expand="block" color="danger" onClick={resetHaulerTimer}>
+          Reset Hauler
+        </IonButton>
 
-            <IonGrid>
-              <IonRow>
-                <IonCol size="8">
-                  <IonText>
-                    <h1>{formatTime(haulerTime)}</h1>
-                  </IonText>
-                </IonCol>
-                <IonCol size="4" className="ion-align-self-center">
-                  <IonSelect
-                    value={selectedHauler}
-                    onIonChange={handleHaulerChange}
-                    interface="popover"
-                  >
-                    <IonSelectOption value="777">777</IonSelectOption>
-                    <IonSelectOption value="773">773</IonSelectOption>
-                  </IonSelect>
-                </IonCol>
-              </IonRow>
-            </IonGrid>
-            <IonButton
-              expand="block"
-              onClick={startHaulerTimer}
-              disabled={isLoaderRunning || haulerButtonDisabled}
-            >
-              Mulai Hauler
-            </IonButton>
-            {!isHaulerRunning ? null : (
-              <IonButton
-                expand="block"
-                color="warning"
-                onClick={stopHaulerTimer}
-              >
-                Stop Hauler
-              </IonButton>
-            )}
-            <IonButton expand="block" color="danger" onClick={resetHaulerTimer}>
-              Reset Hauler
-            </IonButton>
-
-            {/* Summary Section */}
-            {pdtyLoad !== null && pdtyHaul !== null && matchFactor !== null && (
-              <IonCard className="ion-margin-top">
-                <IonCardContent>
-                  <IonGrid>
-                    {[
-                      { label: "Hauler", value: recommendedHauler },
-                      {
-                        label: "PDTY Loader",
-                        value: `${pdtyLoad.toFixed(2)} ton/jam`,
-                      },
-                      {
-                        label: "PDTY Hauler",
-                        value: `${pdtyHaul.toFixed(2)} ton/jam`,
-                      },
-                      { label: "Match Factor", value: matchFactor.toFixed(2) },
-                    ].map((item, index) => (
-                      <IonRow key={index} className="ion-align-items-center">
-                        <IonCol size="6" className="ion-text-wrap">
-                          <IonText color="medium">
-                            <strong>{item.label}</strong>
-                          </IonText>
-                        </IonCol>
-                        <IonCol size="6">
-                          <IonText color="dark">{item.value}</IonText>
-                        </IonCol>
-                      </IonRow>
-                    ))}
-                  </IonGrid>
-                </IonCardContent>
-              </IonCard>
-            )}
-          </>
+        {/* Summary Section */}
+        {pdtyLoad !== null && pdtyHaul !== null && matchFactor !== null && (
+          <IonCard className="ion-margin-top">
+            <IonCardContent>
+              <IonGrid>
+                {[
+                  { label: "Hauler", value: recommendedHauler },
+                  { label: "PDTY Loader", value: `${pdtyLoad.toFixed(2)}` },
+                  { label: "PDTY Hauler", value: `${pdtyHaul.toFixed(2)}` },
+                  { label: "Match Factor", value: matchFactor.toFixed(2) },
+                ].map((item, index) => (
+                  <IonRow key={index} className="ion-align-items-center">
+                    <IonCol size="6" className="ion-text-wrap">
+                      <IonText color="medium">
+                        <strong>{item.label}</strong>
+                      </IonText>
+                    </IonCol>
+                    <IonCol size="6">
+                      <IonText color="dark">{item.value}</IonText>
+                    </IonCol>
+                  </IonRow>
+                ))}
+              </IonGrid>
+            </IonCardContent>
+          </IonCard>
         )}
       </IonContent>
     </IonPage>
