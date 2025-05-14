@@ -33,11 +33,17 @@ const Cycle: React.FC = () => {
   // State timer dan interval
   const [loaderTime, setLoaderTime] = useState(0);
   const [haulerTime, setHaulerTime] = useState(0);
+  const [spottingTime, setSpottingTime] = useState(0);
+
   const [isLoaderRunning, setIsLoaderRunning] = useState(false);
   const [isHaulerRunning, setIsHaulerRunning] = useState(false);
+  const [isSpottingRunning, setIsSpottingRunning] = useState(false);
+
   const [loaderIntervalId, setLoaderIntervalId] =
     useState<NodeJS.Timeout | null>(null);
   const [haulerIntervalId, setHaulerIntervalId] =
+    useState<NodeJS.Timeout | null>(null);
+  const [spottingIntervalId, setSpottingIntervalId] =
     useState<NodeJS.Timeout | null>(null);
 
   // State lain (capacity, material, dll)
@@ -109,6 +115,11 @@ const Cycle: React.FC = () => {
     setPdtyLoad(null);
     setPdtyHaul(null);
     setMatchFactor(null);
+
+    // Jika spotting sedang berjalan, hentikan spotting
+    if (isSpottingRunning) {
+      stopSpottingTimer();
+    }
   };
 
   // Fungsi stop timer loader
@@ -134,6 +145,9 @@ const Cycle: React.FC = () => {
     setPdtyLoad(null);
     setPdtyHaul(null);
     setMatchFactor(null);
+
+    // Reset spotting juga
+    resetSpottingTimer();
   };
 
   // Fungsi mulai timer hauler
@@ -152,6 +166,11 @@ const Cycle: React.FC = () => {
       setHaulerTime(elapsed);
     }, 10);
     setHaulerIntervalId(intervalId);
+
+    // Jika spotting sedang berjalan, hentikan spotting
+    if (isSpottingRunning) {
+      stopSpottingTimer();
+    }
   };
 
   // Fungsi stop timer hauler
@@ -161,6 +180,9 @@ const Cycle: React.FC = () => {
     if (haulerIntervalId) clearInterval(haulerIntervalId);
     calculateRatioAndProduction();
     setHaulerButtonDisabled(false);
+
+    // Mulai spotting time otomatis saat hauler dihentikan
+    startSpottingTimer();
   };
 
   // Fungsi reset timer hauler
@@ -176,22 +198,68 @@ const Cycle: React.FC = () => {
     setPdtyLoad(null);
     setPdtyHaul(null);
     setMatchFactor(null);
+
+    // Reset spotting juga
+    resetSpottingTimer();
+  };
+
+  // Fungsi mulai timer spotting
+  const startSpottingTimer = () => {
+    const startTimestamp = Date.now();
+    localStorage.setItem("spottingStartTime", startTimestamp.toString());
+    localStorage.setItem("spottingRunning", "true");
+
+    setIsSpottingRunning(true);
+    setSpottingTime(0);
+
+    if (spottingIntervalId) clearInterval(spottingIntervalId);
+
+    const intervalId = setInterval(() => {
+      const elapsed = Date.now() - startTimestamp;
+      setSpottingTime(elapsed);
+    }, 10);
+    setSpottingIntervalId(intervalId);
+  };
+
+  // Fungsi stop timer spotting
+  const stopSpottingTimer = () => {
+    setIsSpottingRunning(false);
+    localStorage.setItem("spottingRunning", "false");
+    if (spottingIntervalId) clearInterval(spottingIntervalId);
+  };
+
+  // Fungsi reset timer spotting
+  const resetSpottingTimer = () => {
+    setIsSpottingRunning(false);
+    localStorage.removeItem("spottingStartTime");
+    localStorage.setItem("spottingRunning", "false");
+    if (spottingIntervalId) clearInterval(spottingIntervalId);
+    setSpottingTime(0);
   };
 
   // Fungsi hitung rasio dan produksi
   const calculateRatioAndProduction = () => {
     const loaderSeconds = Math.floor(loaderTime / 1000);
     const haulerSeconds = Math.floor(haulerTime / 1000);
+    const spottingSeconds = Math.floor(spottingTime / 1000);
 
     if (loaderSeconds > 0 && haulerSeconds > 0) {
-      const currentRatio = haulerSeconds / loaderSeconds;
+      // Menghitung rasio waktu hauler dengan total waktu loading dan spotting
+      const currentRatio = haulerSeconds / (loaderSeconds + spottingSeconds);
       setRatio(currentRatio);
-      setRecommendedHauler(Math.round(currentRatio));
 
-      const calculatedPdtyLoad = (3600 / loaderSeconds) * capacity;
+      // Menggunakan rumus yang benar untuk menghitung jumlah hauler yang direkomendasikan
+      // berdasarkan rasio waktu
+      const haulerCount = Math.round(currentRatio);
+      setRecommendedHauler(haulerCount);
+
+      const calculatedPdtyLoad =
+        (3600 / (loaderSeconds + spottingSeconds)) * capacity;
       const calculatedPdtyHaul = (3600 / haulerSeconds) * capacity;
-      const calculatedMatchFactor = recommendedHauler
-        ? (recommendedHauler * calculatedPdtyHaul) / calculatedPdtyLoad
+
+      // Gunakan haulerCount untuk menghitung match factor
+      const calculatedMatchFactor = haulerCount
+        ? (haulerCount * calculatedPdtyHaul) / calculatedPdtyLoad
         : 0;
 
       setPdtyLoad(calculatedPdtyLoad);
@@ -267,10 +335,27 @@ const Cycle: React.FC = () => {
       setHaulerIntervalId(intervalId);
     }
 
+    // Spotting timer
+    const spottingStartStr = localStorage.getItem("spottingStartTime");
+    const spottingRunningStr = localStorage.getItem("spottingRunning");
+    if (spottingStartStr && spottingRunningStr === "true") {
+      const spottingStart = parseInt(spottingStartStr, 10);
+      const elapsed = Date.now() - spottingStart;
+      setSpottingTime(elapsed);
+      setIsSpottingRunning(true);
+
+      if (spottingIntervalId) clearInterval(spottingIntervalId);
+      const intervalId = setInterval(() => {
+        setSpottingTime(Date.now() - spottingStart);
+      }, 10);
+      setSpottingIntervalId(intervalId);
+    }
+
     // Bersihkan interval saat unmount
     return () => {
       if (loaderIntervalId) clearInterval(loaderIntervalId);
       if (haulerIntervalId) clearInterval(haulerIntervalId);
+      if (spottingIntervalId) clearInterval(spottingIntervalId);
     };
   }, []);
 
@@ -297,7 +382,7 @@ const Cycle: React.FC = () => {
   // Hitung rasio dan produksi saat waktu atau kapasitas berubah
   useEffect(() => {
     calculateRatioAndProduction();
-  }, [capacity, loaderTime, haulerTime, recommendedHauler]);
+  }, [capacity, loaderTime, haulerTime, spottingTime]);
 
   return (
     <IonPage>
@@ -421,6 +506,41 @@ const Cycle: React.FC = () => {
             )}
             <IonButton expand="block" color="danger" onClick={resetHaulerTimer}>
               Reset Hauler
+            </IonButton>
+
+            {/* Spotting Timer Section */}
+            <IonGrid>
+              <IonRow>
+                <IonCol size="8">
+                  <IonText>
+                    <h1>{formatTime(spottingTime)}</h1>
+                  </IonText>
+                </IonCol>
+              </IonRow>
+            </IonGrid>
+            {!isSpottingRunning ? (
+              <IonButton
+                expand="block"
+                onClick={startSpottingTimer}
+                disabled={isLoaderRunning || isHaulerRunning}
+              >
+                Mulai Spotting
+              </IonButton>
+            ) : (
+              <IonButton
+                expand="block"
+                color="warning"
+                onClick={stopSpottingTimer}
+              >
+                Stop Spotting
+              </IonButton>
+            )}
+            <IonButton
+              expand="block"
+              color="danger"
+              onClick={resetSpottingTimer}
+            >
+              Reset Spotting
             </IonButton>
 
             {/* Summary Section */}
