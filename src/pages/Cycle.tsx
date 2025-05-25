@@ -1,4 +1,5 @@
 import {
+  IonInput,
   IonCard,
   IonCardContent,
   IonCardHeader,
@@ -423,6 +424,14 @@ const Cycle: React.FC = () => {
             <IonGrid>
               <IonRow>
                 <IonCol size="4">
+                  <IonInput placeholder="ID Loader"></IonInput>
+                </IonCol>
+                <IonCol size="8">
+                  <IonInput placeholder="Nama Pengawas"></IonInput>
+                </IonCol>
+              </IonRow>
+              <IonRow>
+                <IonCol size="4">
                   <IonSelect
                     value={selectedHauler}
                     onIonChange={handleHaulerChange}
@@ -452,38 +461,38 @@ const Cycle: React.FC = () => {
             </IonGrid>
 
             {/* Loader Timer Section */}
-            <div>
-              <IonText>
-                <h1>{formatTime(loaderTime)}</h1>
-              </IonText>
-              {!isLoaderRunning ? (
-                <IonButton expand="block" onClick={startLoaderTimer}>
-                  Mulai Loader
-                </IonButton>
-              ) : (
-                <IonButton
-                  expand="block"
-                  color="warning"
-                  onClick={stopLoaderTimer}
-                >
-                  Stop Loader
-                </IonButton>
-              )}
+            <IonGrid>
+              <IonRow>
+                <IonCol size="8">
+                  <IonText>
+                    <h1 style={{ margin: "0px" }}>{formatTime(loaderTime)}</h1>
+                  </IonText>
+                </IonCol>
+              </IonRow>
+            </IonGrid>
+            {!isLoaderRunning ? (
+              <IonButton expand="block" onClick={startLoaderTimer}>
+                Mulai Loader
+              </IonButton>
+            ) : (
               <IonButton
                 expand="block"
-                color="danger"
-                onClick={resetLoaderTimer}
+                color="warning"
+                onClick={stopLoaderTimer}
               >
-                Reset Loader
+                Stop Loader
               </IonButton>
-            </div>
+            )}
+            <IonButton expand="block" color="danger" onClick={resetLoaderTimer}>
+              Reset Loader
+            </IonButton>
 
             {/* Hauler Timer Section */}
             <IonGrid>
               <IonRow>
                 <IonCol size="8">
                   <IonText>
-                    <h1>{formatTime(haulerTime)}</h1>
+                    <h1 style={{ margin: "0px" }}> {formatTime(haulerTime)}</h1>
                   </IonText>
                 </IonCol>
               </IonRow>
@@ -513,7 +522,9 @@ const Cycle: React.FC = () => {
               <IonRow>
                 <IonCol size="8">
                   <IonText>
-                    <h1>{formatTime(spottingTime)}</h1>
+                    <h1 style={{ margin: "0px" }}>
+                      {formatTime(spottingTime)}
+                    </h1>
                   </IonText>
                 </IonCol>
               </IonRow>
@@ -524,7 +535,7 @@ const Cycle: React.FC = () => {
                 onClick={startSpottingTimer}
                 disabled={isLoaderRunning || isHaulerRunning}
               >
-                Mulai Spotting
+                Mulai Hanging
               </IonButton>
             ) : (
               <IonButton
@@ -532,7 +543,7 @@ const Cycle: React.FC = () => {
                 color="warning"
                 onClick={stopSpottingTimer}
               >
-                Stop Spotting
+                Stop Hanging
               </IonButton>
             )}
             <IonButton
@@ -540,7 +551,7 @@ const Cycle: React.FC = () => {
               color="danger"
               onClick={resetSpottingTimer}
             >
-              Reset Spotting
+              Reset Hanging
             </IonButton>
 
             {/* Summary Section */}
@@ -549,18 +560,31 @@ const Cycle: React.FC = () => {
                 <IonCardContent>
                   <IonGrid>
                     {[
-                      { label: "Hauler", value: recommendedHauler },
-                      { label: "PDTY Loader", value: `${pdtyLoad.toFixed(2)}` },
-                      { label: "PDTY Hauler", value: `${pdtyHaul.toFixed(2)}` },
+                      { label: "Rekomendasi Hauler", value: recommendedHauler },
+                      {
+                        label: "PDTY Loader",
+                        value: `${pdtyLoad.toFixed(2)}`,
+                      },
+                      {
+                        label: "PDTY Hauler",
+                        value: `${pdtyHaul.toFixed(2)}`,
+                      },
+                      {
+                        label: "Target",
+                        value: Math.min(
+                          (recommendedHauler ?? 0) * (pdtyHaul ?? 0),
+                          pdtyLoad ?? 0
+                        ).toFixed(2),
+                      },
                       { label: "Match Factor", value: matchFactor.toFixed(2) },
                     ].map((item, index) => (
                       <IonRow key={index} className="ion-align-items-center">
-                        <IonCol size="6" className="ion-text-wrap">
+                        <IonCol size="8" className="ion-text-wrap">
                           <IonText color="medium">
                             <strong>{item.label}</strong>
                           </IonText>
                         </IonCol>
-                        <IonCol size="6">
+                        <IonCol size="4">
                           <IonText color="dark">{item.value}</IonText>
                         </IonCol>
                       </IonRow>
